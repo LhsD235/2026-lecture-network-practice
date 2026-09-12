@@ -1,93 +1,125 @@
-# 실습 (practice)
+# Computer Networks · Labs
 
-컴퓨터 네트워크 · 매주 **3차시**에 하는 실습입니다.
-이론 1 · 2차시에서 설명한 것을 직접 확인하고, 그 결과를 제출합니다.
+2026-2 · Korea University Sejong · **Weeks 2 – 7**
 
-| 주차 | 폴더 | 주제 |
-|---|---|---|
-| 2 | `w02-agent/` | 코딩 에이전트로 근거 자료 수집과 검증 |
-| 3 | `w03-dns/` | DNS 계층과 CDN |
-| 4 | `w04-tcp/` | TCP handshake와 처리량 |
-| 5 | `w05-ip-nat/` | 주소 · 서브넷 · NAT · DHCP |
-| 6 | `w06-routing/` | OSPF와 재수렴 |
-| 7 | `w07-ethernet-arp/` | ARP와 스위칭 |
-
-각 폴더의 **`TASKS.md`** 가 그 주차 과제입니다. 그것부터 여세요.
-
----
-
-## 제출물
-
-매주 세 가지입니다. 형식은 주차마다 같습니다.
-
-1. **출력** - 명령을 돌린 결과 (`out/` 아래 텍스트 파일)
-2. **캡처** - 해당하는 주차만 (`out/` 아래 `.pcapng`)
-3. **관찰** - `out/observation.md` 에 **2 ~ 3줄**
-
-**세 번째가 가장 중요합니다.** 캡처만 낸 것은 도구를 실행했다는 증거이지,
-돌아온 것을 이해했다는 증거가 아닙니다.
-
-제출 전에 형식 점검을 돌려 보세요. 답을 채점하지 않고 **빠진 것만** 알려 줍니다.
+This is the lab repository. Clone it and work inside it.
 
 ```bash
-python3 check.py w03
+git clone https://github.com/codingchild2424/2026-lecture-network-practice.git
+cd 2026-lecture-network-practice
 ```
 
+The slides live separately and link here week by week.
+
 ---
 
-## 실행 환경
+## The weeks
 
-### 권장 - 컨테이너
+| Week | Folder | Subject |
+|---|---|---|
+| 2 | `w02-agent/` | working with a coding agent |
+| 3 | `w03-dns/` | DNS hierarchy and CDNs |
+| 4 | `w04-tcp/` | reliability, measurement, congestion |
+| 5 | `w05-ip-nat/` | addresses, subnets, NAT, DHCP |
+| 6 | `w06-routing/` | routing and reconvergence |
+| 7 | `w07-ethernet-arp/` | Ethernet, ARP and switching |
 
-도구를 열두 개 설치하는 대신 컨테이너 하나를 씁니다.
-`dig` 나 `iperf3` 의 출력이 사람마다 달라지는 문제도 없어집니다.
+Weeks 9 – 15 are the project. There are no folders for them here.
+
+## How a week works
+
+Every folder holds the same things:
+
+```
+wNN-topic/
+├── README.md        what the week is about, and the three tasks
+├── task1.md         one task, its requirements, its pass condition
+├── task2.md
+├── task3.md
+├── task1_*.py       the code you write
+├── task2_*.py
+├── task3_*.py
+├── bench.py         the measuring harness for task 3 - do not edit it
+└── test_tasks.py    run this before you submit
+```
+
+**Three tasks a week**, and they are different in kind:
+
+| | |
+|---|---|
+| **Task 1 · implementation** | build the mechanism yourself. The tool that normally does it is not allowed |
+| **Task 2 · measurement** | your own machine, your own traffic, your own two networks. **This is the one nobody can do for you** |
+| **Task 3 · improvement** | a deliberately bad implementation is committed here. Beat it, measured by `bench.py` |
+
+There is no separate assignment. **The three tasks are the assignment.**
+
+## Submitting
+
+Put everything under that week's `out/`. Then:
 
 ```bash
-# Docker Desktop 설치 후 (Windows · macOS 공통)
+python3 test_tasks.py         # does it pass?
+python3 ../check.py w03       # is anything missing?
+```
+
+`test_tasks.py` runs your code and checks it against a reference where one exists.
+`check.py` only looks for files. Neither of them can tell whether you understood
+anything, which is what `out/observation.md` is for — **2 to 3 lines per task**,
+and it is the centre of the grade. A capture file proves you ran a tool. It does
+not prove you read what came back.
+
+---
+
+## Running environment
+
+### Recommended · the container
+
+One container instead of installing twelve tools, and everybody gets the same
+output from `dig` and `iperf3`.
+
+```bash
+# with Docker Desktop installed (Windows and macOS alike)
 cd 2026-lecture-network-practice
 docker compose build
-docker compose run --rm lab        # Ubuntu 셸로 들어갑니다
+docker compose run --rm lab        # an Ubuntu shell
 ```
 
-컨테이너 안에 있는 것 - `tshark` `tcpdump` `dig` `curl` `traceroute` `mtr`
-`iperf3` `python3` `jq` `ipcalc`
+Inside: `tshark` `tcpdump` `dig` `curl` `traceroute` `mtr` `iperf3` `python3`
+`jq` `ipcalc`.
 
-### 캡처만은 호스트에서
+### Capture on the host
 
-컨테이너는 여러분 노트북의 랜카드를 볼 수 없습니다. macOS 는 컨테이너가
-리눅스 VM 안에서 돌기 때문에 더욱 그렇습니다.
+The container cannot see your laptop's network card — on macOS especially, since
+it runs inside a Linux VM.
 
-- **캡처** - 호스트에 설치한 Wireshark 로
-- **분석** - 캡처 파일을 `<주차>/out/` 에 두고 컨테이너에서 `tshark -r`
+- **capture** with Wireshark on the host
+- **analyse** by putting the file in `wNN-*/out/` and running `tshark -r` in the container
 
-### 컨테이너를 못 쓴다면
+### If you cannot run Docker
 
-Docker 가 설치되지 않는 노트북이어도 **막히지 않습니다.**
-모든 주차에 경로가 둘 있습니다.
-
-- **(A) 내 트래픽** - 직접 캡처하고 측정
-- **(B) 공식 trace** - 교재 저자가 제공하는 캡처 파일을 분석
-
-(B) 는 호스트에 Wireshark 만 있으면 됩니다. 전원이 같은 파일을 보므로
-서로 답을 맞춰 볼 수도 있습니다. `traces/README.md` 를 보세요.
+Nothing here is blocked by that. Tasks 1 and 3 are pure Python everywhere. Task 2
+has a **path (B)** in every week, using the textbook authors' published traces —
+see `traces/README.md`. Path (B) is weaker, and each week's `task2.md` says
+exactly what it weakens and what you have to write instead.
 
 ---
 
-## 측정 윤리
+## Measurement ethics
 
-패킷을 다루는 과목입니다. 아래를 어기면 실습이 아니라 사고입니다.
+This course handles packets. Breaking any of these is not a lab, it is an incident.
 
-- **본인이 권한을 가진 네트워크와 기기만** 측정합니다
-- 타인의 트래픽을 가로채거나 무선 구간을 무단 캡처하지 않습니다
-- 학교 인프라를 대상으로 부하 시험을 하지 않습니다
-- 제출 전에 캡처에 **다른 사람의 정보가 없는지** 확인합니다
+- Measure **only networks and devices you are authorised to use**
+- Do not intercept anyone else's traffic, and do not capture wireless you do not own
+- Do not run load tests against university infrastructure
+- **Check your captures for other people's data before submitting.** A `port 53`
+  or `port 443` capture records every site your machine touched, including
+  background applications. Close what you can, capture briefly, and look at the
+  file before you hand it in
 
-캡처에 남의 개인정보가 들어갔다면 지우고 다시 뜨십시오.
-지우기 애매하면 (B) 공식 trace 경로로 바꾸면 됩니다.
+If a capture caught someone's personal data, delete it and take it again. If you
+cannot clean it, switch to path (B).
 
----
+## Grading
 
-## 평가
-
-참여율 10%의 일부입니다. 하나하나는 작고, 그래서 넘기기 쉽습니다.
-관찰 서술이 채점의 중심입니다.
+Part of the 10% participation score. Each week is small, which makes it easy to
+skip. The observation write-up is the centre of it.
