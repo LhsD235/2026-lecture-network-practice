@@ -43,37 +43,143 @@ VERIFY_NAMES = [
 
 
 class Resolver:
-    """Your iterative resolver.
 
-    The whole point is that you never ask a server to recurse for you.
-    You ask one server, it says "not mine, ask over there", and you go there.
+    def parse_sections(self, output):
+        sections = {
+            "ANSWER": [],
+            "AUTHORITY": [],
+            "ADDITIONAL": []
+        }
 
-    Suggested shape - but it is yours to design:
+        current = None
 
-        resolve(name) -> (address, path)
-            address : the A record you ended up with, as a string
-            path    : the servers you asked, in order, so you can show your work
+        for line in output.splitlines():
+            line = line.strip()
 
-    Things you will hit, in roughly this order:
+            if line == ";; ANSWER SECTION:":
+                current = "ANSWER"
+                continue
 
-    1.  A delegation gives you NS *names*, sometimes with glue A records and
-        sometimes without. No glue means you have to resolve that nameserver's
-        name first - which is another walk. Decide what you do there.
-    2.  A server may not answer. Try the next one rather than giving up.
-    3.  CNAMEs. The answer you get back may be a different name than the one
-        you asked for, and you have to start again with that name.
-    4.  Loops. Cap your depth.
+            if line == ";; AUTHORITY SECTION:":
+                current = "AUTHORITY"
+                continue
 
-    If you shell out to dig, the flag you want is `+norecurse`, so that the
-    server you ask replies with a delegation instead of doing the work:
+            if line == ";; ADDITIONAL SECTION:":
+                current = "ADDITIONAL"
+                continue
 
-        dig @198.41.0.4 www.korea.ac.kr +norecurse
-    """
+            if line.startswith(";; ") and line.endswith("SECTION:"):
+                current = None
+                continue
 
-    def resolve(self, name):
-        raise NotImplementedError(
-            "Implement the iterative walk: root -> TLD -> authoritative")
+            if not line or line.startswith(";"):
+                continue
 
+            if current is not None:
+                parts = line.split()
+
+                if len(parts) >= 5:
+                    record = {
+                        "name": parts[0],
+                        "ttl": parts[1],
+                        "class": parts[2],
+                        "type": parts[3],
+                        "value": parts[4]
+                    }
+
+                    sections[current].append(record)
+
+        return sections
+
+    def query(self, server, name):
+        result = subprocess.run(
+            ["dig", f"@{server}", name, "A", "+norecurse"],
+            capture_output=True,
+            text=True,
+            timeout=3
+        )
+        return result.stdout
+
+    def get_glue_servers(self, sections):
+        ns_names = set()
+
+        for record in sections["AUTHORITY"]:
+            if record["type"] == "NS":
+                ns_names.add(record["value"])
+
+        servers = []
+
+        for record in sections["ADDITIONAL"]:
+            if record["type"] == "A" and record["name"] in ns_names:
+                servers.append(record["value"])
+
+        return servers
+
+    def resolve(self, name, depth = 0):
+        if depth > 8:
+            raise RuntimeError("Too many recursive NS lookups")
+        servers = ROOT_SERVERS[:]
+        path = []
+
+        for _ in range(20):
+            next_servers = []
+            cname_found = None
+
+            for server in servers:
+                path.append(server)
+
+                try:
+                    output = self.query(server,name)
+                    sections = self.parse_sections(output)
+
+                except subprocess.TimeoutExpired:
+                    continue
+
+                for record in sections["ANSWER"]:
+                    if record["type"] == "A":
+                        return record["value"], path
+
+                for record in sections["ANSWER"]:
+                    if record["type"] == "CNAME":
+                        cname_found = record["value"]
+                        break
+
+                if cname_found:
+                    break
+
+                next_servers = self.get_glue_servers(sections)
+
+                if not next_servers:
+                    ns_names = []
+
+                    for record in sections["AUTHORITY"]:
+                        if record["type"] == "NS":
+                            ns_names.append(record["value"])
+
+                    for ns_name in ns_names:
+                        try:
+                            ns_addr, ns_path = self.resolve(ns_name, depth + 1)
+
+                            path.extend(ns_path)
+                            next_servers.append(ns_addr)
+
+                        except Exception:
+                            continue
+
+                if next_servers:
+                    break
+
+            if cname_found:
+                name = cname_found
+                servers = ROOT_SERVERS[:]
+                continue
+
+            if not next_servers:
+                raise RuntimeError("Could not find the next DNS server")
+
+            servers = next_servers
+
+        raise RuntimeError("Too many DNS delegation steps")
 
 # ------------------------------------------------------------------- harness
 def dig_answer(name):

@@ -64,20 +64,35 @@ class BaselineCache:
 
 
 class YourCache:
-    """Your cache.
-
-    Same interface: __init__(upstream), lookup(name, now) -> address, stats().
-    `upstream(name)` costs a network round trip and returns (address, ttl).
-    The TTL is in seconds and it is the authoritative answer's own TTL -
-    the baseline throws it away.
-    """
+    """TTL을 올바르게 지키는 DNS cache."""
 
     def __init__(self, upstream):
         self.upstream = upstream
-        raise NotImplementedError("write your cache")
+
+        # name -> (address, expires_at)
+        self.entries = {}
 
     def lookup(self, name, now):
-        raise NotImplementedError("write your cache")
+        # 캐시에 존재하는 경우
+        if name in self.entries:
+            address, expires_at = self.entries[name]
+
+            # 아직 TTL이 지나지 않았다면 캐시 사용
+            if now < expires_at:
+                return address
+
+            # 만료된 데이터는 삭제
+            del self.entries[name]
+
+        # 캐시에 없거나 만료되었으면 upstream에 질문
+        address, ttl = self.upstream(name)
+
+        # 실제 TTL을 이용해서 만료 시각 저장
+        expires_at = now + ttl
+
+        self.entries[name] = (address, expires_at)
+
+        return address
 
     def stats(self):
-        return {}
+        return {"entries": len(self.entries)}
