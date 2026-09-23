@@ -68,25 +68,106 @@ class Sender:
     """
 
     def __init__(self, data_channel, ack_channel, data):
-        raise NotImplementedError("write your sender")
+        self.data_channel = data_channel
+        self.ack_channel = ack_channel
+
+        # 원본 데이터를 PAYLOAD 크기로 나누고 번호 붙이기
+        self.packets = []
+
+        for i in range(0, len(data), PAYLOAD):
+            seq = len(self.packets)
+            piece = data[i:i + PAYLOAD]
+
+            self.packets.append((seq, piece))
+
+        # 현재 전송할 패킷 번호
+        self.next_seq = 0
+
+        # ACK를 기다리는 중인지
+        self.waiting = False
+
+        # 재전송을 위한 시간 관리
+        self.elapsed = 0
+        self.timeout = 5
 
     def step(self):
-        """Do one unit of work. Return False when you believe you are done."""
-        raise NotImplementedError
+        # 모든 패킷의 ACK를 받았다면 종료
+        if self.next_seq >= len(self.packets):
+            return False
+
+        # ACK 하나 확인
+        ack = self.ack_channel.receive()
+
+        # 현재 기다리는 패킷에 대한 ACK인지 확인
+        if self.waiting and ack == ("ACK", self.next_seq):
+            self.next_seq += 1
+            self.waiting = False
+            self.elapsed = 0
+
+            # 마지막 패킷까지 확인받았다면 종료
+            if self.next_seq >= len(self.packets):
+                return False
+
+        # 아직 보내지 않은 패킷 전송
+        if not self.waiting:
+            self.data_channel.send(self.packets[self.next_seq])
+            self.waiting = True
+            self.elapsed = 0
+
+        # ACK를 기다리는 중
+        else:
+            self.elapsed += 1
+
+            # 일정 시간 동안 ACK가 없으면 재전송
+            if self.elapsed >= self.timeout:
+                self.data_channel.send(self.packets[self.next_seq])
+                self.elapsed = 0
+
+        return True
 
 
 class Receiver:
-    """Your receiver. Hands back the reassembled bytes via `.data()`."""
+    """Stop-and-wait receiver."""
 
     def __init__(self, data_channel, ack_channel):
-        raise NotImplementedError("write your receiver")
+        self.data_channel = data_channel
+        self.ack_channel = ack_channel
+
+        # 다음에 받아야 할 패킷 번호
+        self.expected_seq = 0
+
+        # 순서대로 받은 데이터 저장
+        self.received = bytearray()
 
     def step(self):
-        raise NotImplementedError
+        # 네트워크에서 패킷 하나 받기
+        packet = self.data_channel.receive()
+
+        # 도착한 패킷이 없으면 종료
+        if packet is None:
+            return
+
+        seq, payload = packet
+
+        # 기다리던 번호가 도착했다면 데이터 저장
+        if seq == self.expected_seq:
+            self.received.extend(payload)
+
+            # 해당 패킷을 정상적으로 받았다고 알림
+            self.ack_channel.send(("ACK", seq))
+
+            # 다음 번호를 기다림
+            self.expected_seq += 1
+
+        # 이미 받은 패킷이 중복 도착했다면
+        elif seq < self.expected_seq:
+            # 데이터는 다시 저장하지 않고 ACK만 재전송
+            self.ack_channel.send(("ACK", seq))
+
+        # 아직 받을 순서가 아닌 패킷은 저장하지 않음
 
     def data(self):
-        """The bytes reassembled so far."""
-        raise NotImplementedError
+        return bytes(self.received)
 
 
 # ------------------------------------------------------------------- harness
