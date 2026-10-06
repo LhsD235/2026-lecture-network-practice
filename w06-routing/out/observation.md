@@ -1,65 +1,21 @@
-# Week 6 observations
+# 6주차 관찰 기록
 
-## Task 1
+## 과제 1
 
-Equal-cost paths use the alphabetically smaller first hop, giving a stable and
-repeatable table. A production router may install multiple equal-cost next hops
-(ECMP) instead. From `u`, the next hop for `w` is `x`: `u-x-y-w` costs 3 while
-the direct `u-w` link costs 5. After `u-x` fails, the next hops for `w`, `x`,
-`y`, and `z` change to `v`; the next hop for `v` remains `v`.
+비용이 같은 경로가 여러 개면 첫 next hop의 알파벳 순서가 빠른 것을 선택해 항상 같은 forwarding table이 나오도록 했다. 실제 router라면 같은 비용의 경로를 여러 개 설치하는 ECMP를 사용할 수도 있다. `u`에서 `w`로 갈 때 direct link의 비용은 5지만 `u-x-y-w`는 3이므로 next hop은 `x`가 된다. `u-x`가 끊기면 `w`, `x`, `y`, `z`의 next hop은 모두 `v`로 바뀐다.
 
-## Task 2
+## 과제 2
 
-The local private gateway is hop 1 (`192.168.35.1`) and the path enters the
-public ISP at hop 2 (`123.212.146.1`). The domestic destination stops replying
-after hop 7, so the precise destination-side handoff cannot be named from this
-capture alone.
+Traceroute에서 첫 hop은 사설 gateway `192.168.35.1`, 두 번째 hop은 공인 ISP 주소 `123.212.146.1`이었다. 국내 목적지는 7 hop 이후 응답하지 않아 목적지 쪽 인계 지점을 정확히 정할 수 없었다. Stanford 경로는 9 hop에서 Hong Kong, 12 hop에서 Tokyo, 14 hop에서 Seattle이 나타났고, Tokyo와 Seattle 사이에서 지연 시간이 약 100 ms 증가해 태평양 해저 구간을 지난 것으로 추정했다. 다만 traceroute만으로 실제 해저 cable의 이름까지 확정할 수는 없다.
 
-The Stanford path reaches Hong Kong at hop 9, Tokyo at hop 12, and Seattle at
-hop 14. The Tokyo-to-Seattle transition and roughly 100 ms increase indicate a
-trans-Pacific submarine segment, although traceroute alone cannot prove the
-specific physical cable. The `1.1.1.1` anycast route took 13 hops and only about
-5-8 ms at the destination, indicating that BGP selected a nearby Korean replica
-rather than Cloudflare's distant origin.
+`1.1.1.1` anycast 경로는 13 hop이었고 최종 지연 시간이 약 5–8 ms라서 멀리 있는 원본 server가 아니라 국내와 가까운 replica가 선택된 것으로 보였다. 중간의 `* * *`는 router가 TTL-expired ICMP 응답을 제한했기 때문일 수도 있고 실제 손실이나 filtering 때문일 수도 있다. 뒤쪽 hop이 다시 응답하면 경로 전체가 끊어진 것보다는 해당 router만 traceroute에 답하지 않은 경우로 보는 것이 맞다.
 
-`* * *` can mean that an intermediate router deliberately drops or rate-limits
-TTL-expired ICMP replies even though it still forwards packets. It can also mean
-real loss, filtering, or a failure on the path. If later hops answer, the silent
-router is usually just not answering traceroute rather than a broken route.
+OSPF 실험 전에는 `r1`이 직접 연결되지 않은 `172.22.0.0/16`을 `r2`와 `r3` 양쪽을 통해 비용 20으로 학습했다. `r1-r2` link를 끊은 뒤에는 `172.19.0.3` 방향 경로가 사라지고 `172.20.0.3` 방향 경로만 남았다. Docker Hub의 기존 FRR image가 없어 처음에 router가 실행되지 않았고, image 주소를 `quay.io/frrouting/frr:9.1.0`으로 바꾼 뒤 실험할 수 있었다.
 
-Before the cut, every router had learned a network to which it had no direct
-link. For example, `r1` reached `172.22.0.0/16` through both `r2` and `r3` with
-equal cost 20. After the `r1-r2` link was cut, `r1` removed the path through
-`172.19.0.3` and retained the working path through `172.20.0.3`. This is OSPF
-reconvergence rather than a packet carrying its complete route.
+Link down, 복구, cost 변경은 모두 1초로 기록됐다. Interface를 관리 명령으로 내렸기 때문에 FRR이 상태 변화를 바로 받았고, 측정 script도 1초마다 확인했기 때문에 실제 sub-second 차이는 구분할 수 없었다. 따라서 이 결과로 세 경우의 실제 수렴 시간이 같다고 결론 내리거나 OSPF dead timer 만료 시간을 측정했다고 말할 수는 없다.
 
-Link-down and link-restoration reconvergence were both recorded as 1 second.
-The link was administratively disabled, so FRR received an immediate interface
-event instead of waiting for the normal dead interval. In addition, the script
-polls once per second, so it cannot distinguish two sub-second results. Thus the
-measurement is consistent with immediate link-state notification, but it does
-not measure dead-timer expiry; a silent packet-loss experiment and a finer timer
-would be required for that measurement.
+## 과제 3
 
-Raising `r1`'s `eth0` OSPF cost from 10 to 100 also reconverged in the recorded
-1 second. `r1` stopped using its direct `eth0` path and sent traffic through
-`eth1`; `r3` likewise changed its route toward `172.19.0.0/16`. A cost change
-does not wait for failure detection: the new LSA can be flooded and SPF run at
-once. The one-second polling resolution hides any smaller difference between
-this result and the administrative link events.
+매번 전체 SPF를 다시 실행하지 않기 위해 각 node까지의 거리, parent, shortest-path tree edge를 저장했다. 사용하지 않는 edge의 삭제나 비용 증가는 건너뛰고, 새 edge 또는 비용이 낮아진 edge가 거리를 실제로 줄일 때만 해당 지점부터 갱신했다. 사용 중인 tree edge나 equal-cost처럼 판단이 애매한 변화는 정확성을 위해 전체 SPF로 돌아갔다.
 
-## Task 3
-
-The incremental router keeps the distance to each node, the chosen parent, and
-the shortest-path-tree edges in addition to the forwarding table, which costs
-O(V) extra memory. A removed or more expensive non-tree edge is skipped. A new
-or cheaper edge is tested against the saved endpoint distances, and strict
-improvements are propagated locally; ambiguous equal-cost changes and changes
-to a used tree edge fall back to a full SPF.
-
-The result was correct after all 1,000 events and avoided 71% of full SPF runs
-(290 versus 1,001). It was still slower in this Python benchmark because copying
-dictionaries, maintaining metadata, and checking incremental cases add overhead.
-A real router can still prefer this design because avoiding large bursts of full
-SPF CPU work improves control-plane responsiveness and reconvergence stability;
-it trades modest memory and bookkeeping for bounded work during link flaps.
+1,000개 event 뒤에도 모든 forwarding 결과가 맞았고 전체 SPF 실행은 1,001회에서 290회로 줄어 71%를 피했다. 하지만 Python benchmark의 실행 시간은 dictionary 복사와 metadata 관리 비용 때문에 오히려 더 느렸다. 실제 router에서는 link flap 때 큰 SPF 계산이 반복되는 것을 줄여 control plane을 안정시키는 장점이 있으므로, 단순 wall time만으로 이 최적화의 가치를 판단하면 안 된다고 생각했다.

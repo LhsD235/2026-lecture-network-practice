@@ -1,19 +1,19 @@
-# Week 5 observations
+# 5주차 관찰 기록
 
-## Task 1
+## 과제 1
 
-- I treated both `/31` addresses as usable under RFC 3021 and a `/32` as one host; the main edge-case lesson was that the usual “exclude network and broadcast” rule is not universal.
-- `10.20.30.70` matched the default route and the `/8`, `/16`, `/24`, and `/26` routes, so longest-prefix match chose `/26` (`lab-rack-2`).
-- An exact duplicate prefix updates its next hop. The difficult design point was making masks and boundary cases correct with only 32-bit shifts, without `ipaddress`.
+`/31`은 RFC 3021에 따라 두 주소를 모두 사용할 수 있게 처리했고, `/32`는 하나의 host를 나타내도록 했다. 이 과정에서 network 주소와 broadcast 주소를 항상 제외하는 일반적인 규칙이 모든 prefix에 적용되는 것은 아니라는 점을 알게 되었다.
 
-## Task 2
+`10.20.30.70`은 default route와 `/8`, `/16`, `/24`, `/26` route에 모두 일치했지만, longest-prefix match 규칙에 따라 `/26`의 `lab-rack-2`가 선택되었다. 같은 prefix가 다시 추가되면 내 table에서는 next hop을 새 값으로 갱신한다.
 
-- Home Wi-Fi used `192.168.35.43/24` with public IP `123.212.146.211`; the phone hotspot used `172.20.10.2/28` with public IP `117.111.5.127`, so both the local DHCP subnet and Internet exit changed.
-- A private/public mismatch proves at least one NAT, but traceroute alone cannot prove every translation layer; the router or phone's WAN address is needed to distinguish one NAT from upstream CGNAT.
-- Capturing DORA required starting the capture before lease renewal. Discover was `0.0.0.0 -> 255.255.255.255`, and the server offered `172.20.10.2` for 3,600 seconds before ACK could be unicast.
+## 과제 2
 
-## Task 3
+처음에는 두 번째 네트워크로 WSL 가상 adapter를 사용했지만 실제로는 집 Wi-Fi 회선을 공유하고 있어 비교 대상으로 적절하지 않았다. 그래서 휴대폰 핫스팟으로 다시 측정했고, 사설/공인 주소가 `192.168.35.43/24`, `123.212.146.211`에서 `172.20.10.2/28`, `117.111.5.127`로 모두 바뀌었다.
 
-- I grouped routes by prefix length and searched populated lengths from longest to shortest, reducing lookup from O(N) routes to O(P) populated lengths, where `P <= 33`, with O(N) route storage.
-- The main difficulty was preserving correctness for the default route and duplicate prefixes while optimizing; all 20,000 answers matched and lookup was over 1,000× faster.
-- A bitwise trie gives a deterministic walk of at most 32 bits and suits hardware, but CPython's C-implemented hash tables were faster here, showing that asymptotic structure and implementation cost must both be considered.
+사설 주소와 공인 주소가 다르므로 NAT가 최소 한 번 있다는 것은 알 수 있지만, 이동통신사의 CGNAT가 추가로 있는지는 이 결과만으로 확정할 수 없었다. DORA는 Wireshark를 먼저 실행한 뒤 `ipconfig /release`와 `/renew`를 수행해 직접 캡처했다. Discover는 `0.0.0.0 -> 255.255.255.255`였고, 핫스팟은 `172.20.10.2`를 1시간 동안 임대했다.
+
+## 과제 3
+
+route를 prefix 길이별로 묶고 긴 길이부터 조회하도록 구현했다. 조회 비용은 전체 route 수에 비례하는 O(N)에서 실제로 존재하는 prefix 길이 수에 비례하는 O(P)로 줄었고, IPv4에서 `P`는 최대 33이다. 최적화하면서 default route와 중복 prefix의 동작이 기준 구현과 달라지지 않도록 하는 부분을 가장 조심했다.
+
+20,000개 질의의 결과가 모두 일치했고 조회 속도는 1,000배 이상 빨라졌다. Bitwise trie도 최대 32 bit만 따라가므로 hardware에 적합하지만, 이번 Python 실험에서는 내부가 C로 구현된 dictionary 방식이 더 빨랐다.

@@ -1,64 +1,37 @@
-# Task 2 — Address, NAT, and DHCP report
+# 과제 2 · 주소, NAT, DHCP 보고서
 
-Measurements were collected on home Wi-Fi on 2026-09-28 and on a phone
-hotspot on 2026-10-06 (Asia/Seoul).
+집 Wi-Fi는 2026-09-28에, 휴대폰 핫스팟은 2026-10-06에 측정했다. 시간대는 Asia/Seoul이다.
 
-## Part A — Home Wi-Fi address and NAT
+## A. 집 Wi-Fi 주소와 NAT
 
-- Interface IPv4 address: `192.168.35.43`
-- Mask: `255.255.255.0` (`/24`)
-- Default gateway and DHCP server: `192.168.35.1`
-- Public address reported by api.ipify.org: `123.212.146.211`
+- interface IPv4 주소: `192.168.35.43`
+- subnet mask: `255.255.255.0` (`/24`)
+- default gateway와 DHCP server: `192.168.35.1`
+- 외부 서버가 확인한 public address: `123.212.146.211`
 
-`192.168.35.43 AND 255.255.255.0 = 192.168.35.0`, so the subnet is
-`192.168.35.0/24`. Its broadcast address is `192.168.35.255`, and its ordinary
-usable-host interval is `192.168.35.1` through `192.168.35.254`. This agrees
-with Task 1's `network_range` result.
+`192.168.35.43 AND 255.255.255.0 = 192.168.35.0`이므로 subnet은 `192.168.35.0/24`이다. Broadcast 주소는 `192.168.35.255`이고 일반적인 사용 가능 host 범위는 `192.168.35.1`부터 `192.168.35.254`까지다. 이 결과는 과제 1의 `network_range`로 계산한 값과 같았다.
 
-The gateway `192.168.35.1` is inside the usable interval. A directly configured
-gateway must be on-link so that the host can resolve its link-layer address and
-send it a frame without first needing another router.
+Gateway `192.168.35.1`은 사용 가능한 주소 범위 안에 있다. Host가 gateway의 link-layer 주소를 알아내고 다른 router를 거치지 않은 채 frame을 보내려면 직접 연결된 같은 subnet에 있어야 한다.
 
-The interface address is RFC 1918 private space, while `123.212.146.211` is a
-public address. Their difference proves at least one NAT. The first public
-traceroute hop follows the home gateway, so one customer-edge NAT is the
-best-supported count. To rule out a second upstream NAT, the router's WAN
-address must be checked: a private or `100.64.0.0/10` WAN address would prove an
-additional upstream/CGNAT layer.
+Interface 주소는 RFC 1918 사설 주소이고 `123.212.146.211`은 공인 주소이므로 NAT가 최소 한 번 존재한다. Traceroute에서는 집 gateway 다음에 바로 공인 ISP hop이 나와 customer-edge NAT 한 번이 가장 가능성 높은 설명이었다. 다만 router의 WAN 주소가 사설 주소나 `100.64.0.0/10`인지 확인하지 않았으므로 upstream NAT 또는 CGNAT가 없다고 완전히 단정할 수는 없다.
 
-## Part B — Home Wi-Fi versus phone hotspot
+## B. 집 Wi-Fi와 휴대폰 핫스팟 비교
 
-The phone hotspot assigned `172.20.10.2/28`, with network
-`172.20.10.0/28`, usable interval `172.20.10.1`–`172.20.10.14`, broadcast
-`172.20.10.15`, and gateway/DHCP server `172.20.10.1`. The outside service saw
-`117.111.5.127`.
+휴대폰 핫스팟은 `172.20.10.2/28`을 할당했다. Network는 `172.20.10.0/28`, 사용 가능한 범위는 `172.20.10.1`–`172.20.10.14`, broadcast는 `172.20.10.15`였고 gateway와 DHCP server는 `172.20.10.1`이었다. 외부 서버가 확인한 주소는 `117.111.5.127`이었다.
 
-Both the private and public addresses changed. The private address changed
-because the phone runs a different DHCP-controlled local subnet from the home
-router. The public address changed because traffic left through the mobile
-carrier instead of the home ISP. The private hotspot address and different
-public address prove at least one NAT between the laptop and the Internet. A
-second carrier NAT is possible, but it can be proved only by comparing the
-phone's carrier-facing address with `117.111.5.127`.
+사설 주소와 공인 주소가 모두 바뀌었다. 사설 주소가 바뀐 이유는 집 router와 휴대폰이 서로 다른 DHCP subnet을 제공하기 때문이고, 공인 주소가 바뀐 이유는 집 ISP 대신 이동통신사 망을 통해 인터넷으로 나갔기 때문이다. 노트북의 사설 주소와 외부에서 보이는 주소가 다르므로 NAT가 최소 한 번 존재한다. 이동통신사의 NAT가 한 번 더 있는지는 휴대폰의 이동통신망 쪽 주소와 `117.111.5.127`을 비교해야 확인할 수 있다.
 
-## Part C — DHCP DORA captured on the phone hotspot
+## C. 휴대폰 핫스팟에서 캡처한 DHCP DORA
 
-`dhcp.pcapng` is this machine's own Wi-Fi capture, taken while releasing and
-renewing the hotspot lease. TShark found all four messages:
+`dhcp.pcapng`는 핫스팟의 임대를 release한 뒤 renew하면서 직접 캡처한 파일이다. TShark로 다음 네 메시지를 확인했다.
 
-| Message | Source | Destination | Offered/client address |
+| 메시지 | 출발지 | 목적지 | 제안 또는 client 주소 |
 |---|---|---|---|
 | Discover | `0.0.0.0` | `255.255.255.255` | — |
 | Offer | `172.20.10.1` | `172.20.10.2` | `172.20.10.2` |
 | Request | `0.0.0.0` | `255.255.255.255` | — |
 | ACK | `172.20.10.1` | `172.20.10.2` | `172.20.10.2` |
 
-Discover uses source `0.0.0.0` because the client does not yet own a usable
-IPv4 address. It broadcasts to `255.255.255.255` because it also does not yet
-know the DHCP server or its subnet.
+Discover의 출발지가 `0.0.0.0`인 이유는 client가 아직 사용할 IPv4 주소를 받지 못했기 때문이다. DHCP server와 자신의 subnet도 모르는 상태이므로 목적지는 broadcast 주소인 `255.255.255.255`가 된다.
 
-The server offered a 3,600-second (one-hour) lease. By the ACK, the server knows
-the offered client address and the client's link-layer identity, and this
-client can receive the unicast reply, so the ACK is sent from `172.20.10.1` to
-`172.20.10.2`. Normally the client starts renewal at half the lease, about
-1,800 seconds in this capture.
+Server가 제안한 임대 시간은 3,600초, 즉 1시간이었다. ACK 단계에서는 server가 client에게 제안한 주소와 link-layer 식별 정보를 알고 있고, client도 unicast를 받을 수 있으므로 `172.20.10.1`에서 `172.20.10.2`로 직접 응답했다. 일반적으로 임대 시간의 절반인 약 1,800초가 지나면 갱신을 시작한다.

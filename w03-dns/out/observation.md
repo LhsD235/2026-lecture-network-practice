@@ -1,10 +1,13 @@
-# Week 03 Observations
+# 3주차 관찰 기록
 
-## Task 1
-The root DNS server does not store the final IP address for every domain. Instead, it tells the resolver which DNS server to query next. If a delegation has no glue record, my resolver resolves the NS hostname first, which requires an extra resolution walk for that NS name. In the www.korea.ac.kr capture, both delegations included glue, so this added 0 extra lookups in that run. My resolver contacted 3 DNS servers, while a normal laptop usually sends one query to its recursive resolver.
+## 과제 1
 
-## Task 2
-When I checked the DNS responses, a delegation response gave information about which DNS server to query next, while the final response contained the actual IP address. I classified a site as third-party when the final CNAME zone differed from the original site's zone, but this rule incorrectly classified www.wikipedia.org because wikimedia.org is operated by the same organization. Among 10 CDN-hosted sites, 7 returned different IP addresses depending on the resolver or network, which supports DNS steering but does not prove that the returned server is actually the closest one.
+처음에는 DNS 서버 한 곳에 도메인을 보내면 바로 IP 주소를 돌려주는 줄 알았다. 직접 resolver의 동작을 따라가 보니 root DNS는 최종 주소 대신 다음에 물어볼 서버를 알려주고 있었다. `www.korea.ac.kr` 조회에서는 두 위임 응답에 glue record가 있어서 NS 서버 주소를 따로 찾을 필요가 없었고, 최종 답을 얻을 때까지 DNS 서버 3곳에 질의했다.
 
-## Task 3
-The baseline cache stores all DNS information for 60 seconds, so a short real TTL can cause expired IP addresses to be returned (correctness problem), while a long real TTL can cause unnecessary DNS queries (performance problem). www.microsoft.com was handled worst because its TTL is only 20 seconds and it is queried frequently. Using the actual TTL reduced stale answers from 266 to 0 and upstream queries from 325 to 275; 275 is the minimum because the first request for each name and the first request after each TTL expiration must contact upstream.
+## 과제 2
+
+나는 처음에 CNAME과 A record가 같은 종류의 답이라고 생각했다. 실습하면서 CNAME은 IP 주소가 아니라 다른 도메인 이름을 가리키는 별명이고, 그 이름을 계속 따라간 뒤 A record에서 실제 IPv4 주소를 얻는다는 차이를 이해했다. 다만 CNAME의 zone만 보고 third-party를 구분하는 규칙은 `wikipedia.org`와 `wikimedia.org`처럼 이름은 달라도 같은 운영 주체인 경우 틀릴 수 있었다. 또한 네트워크에 따라 다른 IP가 나와도 그 서버가 무조건 가장 가깝다고 단정할 수는 없었다.
+
+## 과제 3
+
+처음에는 TTL이 끝나도 IP 주소가 바뀌지 않았다면 cache 값을 계속 써도 맞는 것 아닌가 생각했다. 주소가 우연히 그대로일 수는 있지만, client는 실제로 변경됐는지 알 수 없기 때문에 TTL이 끝난 값을 정답으로 믿으면 안 된다는 점을 알게 되었다. 실제 TTL을 사용하자 stale 응답은 266개에서 0개로 줄었고 upstream 질의도 325회에서 275회로 줄었다. 따라서 hit rate만 높은 cache보다 만료 규칙을 지키면서 불필요한 질의도 줄이는 cache가 더 중요했다.
