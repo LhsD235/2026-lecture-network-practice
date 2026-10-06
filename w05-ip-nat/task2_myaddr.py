@@ -12,7 +12,7 @@ the rest of the world sees, and why those two are usually different.
 Run it on **two networks**. Campus Wi-Fi and phone tethering behave differently
 here, and the difference is the lesson.
 """
-import argparse, json, os, platform, subprocess
+import argparse, json, os, platform, subprocess, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
@@ -46,7 +46,13 @@ def local_facts():
 def public_address():
     """What a server on the outside says your address is."""
     out = sh("curl", "-s", "--max-time", "10", "https://api.ipify.org")
-    return out.strip() or None
+    if out.strip() and not out.startswith("<failed:"):
+        return out.strip()
+    try:
+        with urllib.request.urlopen("https://api.ipify.org", timeout=10) as response:
+            return response.read().decode("ascii").strip() or None
+    except Exception:
+        return None
 
 
 def collect(label):
@@ -63,8 +69,10 @@ def collect(label):
 
 
 def report():
-    raise NotImplementedError(
-        "write out/report.md by hand, or generate it - see task2.md")
+    path = os.path.join(OUT, "report.md")
+    if not os.path.exists(path):
+        raise FileNotFoundError("write out/report.md after collecting two networks")
+    print(open(path, encoding="utf-8").read())
 
 
 if __name__ == "__main__":

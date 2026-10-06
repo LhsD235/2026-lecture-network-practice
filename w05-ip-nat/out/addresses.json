@@ -1,0 +1,41 @@
+[
+  {
+    "label": "home Wi-Fi",
+    "collected_at": "2026-09-28 Asia/Seoul",
+    "interface": "Intel(R) Wi-Fi 6E AX211 160MHz",
+    "address": "192.168.35.43",
+    "mask": "255.255.255.0",
+    "prefix_length": 24,
+    "network": "192.168.35.0/24",
+    "first_usable": "192.168.35.1",
+    "last_usable": "192.168.35.254",
+    "broadcast": "192.168.35.255",
+    "gateway": "192.168.35.1",
+    "dhcp_server": "192.168.35.1",
+    "public": "123.212.146.211",
+    "local": {
+      "os": "Windows",
+      "source": "ipconfig /all and route print -4"
+    }
+  },
+  {
+    "label": "phone hotspot",
+    "collected_at": "2026-10-06 Asia/Seoul",
+    "interface": "Intel(R) Wi-Fi 6E AX211 160MHz",
+    "address": "172.20.10.2",
+    "mask": "255.255.255.240",
+    "prefix_length": 28,
+    "network": "172.20.10.0/28",
+    "first_usable": "172.20.10.1",
+    "last_usable": "172.20.10.14",
+    "broadcast": "172.20.10.15",
+    "gateway": "172.20.10.1",
+    "dhcp_server": "172.20.10.1",
+    "lease_seconds": 3600,
+    "public": "117.111.5.127",
+    "local": {
+      "os": "Windows",
+      "source": "ipconfig /all, route print -4, and own DHCP capture"
+    }
+  }
+]

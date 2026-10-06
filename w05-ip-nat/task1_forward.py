@@ -16,6 +16,39 @@ exactly the thing you are supposed to understand this week.
 import argparse
 
 
+UINT32_MASK = 0xFFFFFFFF
+
+#32비트 정수로 변환(문자열 -> 정수)
+def _parse_ipv4(address):
+    """Convert dotted-decimal IPv4 to an unsigned 32-bit integer."""
+    if not isinstance(address, str):
+        raise ValueError("IPv4 address must be a string")
+    #.을 기준으로 분리
+    parts = address.split(".")
+    if len(parts) != 4:
+        raise ValueError(f"invalid IPv4 address: {address!r}")
+
+    value = 0
+    for part in parts:
+        # Requiring decimal digits avoids accepting signs, hex, or empty octets.
+        if not part or not part.isascii() or not part.isdecimal():
+            raise ValueError(f"invalid IPv4 address: {address!r}")
+        octet = int(part, 10)
+        if octet > 255:
+            raise ValueError(f"IPv4 octet out of range: {part!r}")
+        value = (value << 8) | octet
+    return value
+
+#_parse_ipv4의 반대 작업(정수 -> 문자열)
+def _format_ipv4(address):
+    return ".".join(str((address >> shift) & 0xFF)
+                    for shift in (24, 16, 8, 0))
+
+
+def _mask(prefix_len):
+    return 0 if prefix_len == 0 else (UINT32_MASK << (32 - prefix_len)) & UINT32_MASK
+
+
 def parse_cidr(cidr):
     """'163.152.6.0/24' -> (network as int, prefix length).
 
@@ -23,7 +56,21 @@ def parse_cidr(cidr):
     whose host bits are set when they should not be (163.152.6.5/24 is a
     common way to write a host, but it is not a network).
     """
-    raise NotImplementedError("parse a CIDR block")
+    if not isinstance(cidr, str) or cidr.count("/") != 1:
+        raise ValueError(f"invalid CIDR block: {cidr!r}")
+    address_text, prefix_text = cidr.split("/", 1)
+    if not prefix_text or not prefix_text.isascii() or not prefix_text.isdecimal():
+        raise ValueError(f"invalid prefix length: {prefix_text!r}")
+    prefix_len = int(prefix_text, 10)
+    if not 0 <= prefix_len <= 32:
+        raise ValueError("prefix length must be between 0 and 32")
+
+    address = _parse_ipv4(address_text)
+    mask = _mask(prefix_len)
+    network = address & mask
+    if address != network:
+        raise ValueError(f"host bits are set in {cidr!r}")
+    return network, prefix_len
 
 
 def network_range(cidr):
@@ -32,7 +79,17 @@ def network_range(cidr):
     Careful at the edges. /31 and /32 do not have a usable host range in the
     ordinary sense - decide what you return and say so in observation.md.
     """
-    raise NotImplementedError("compute the range")
+    network, prefix_len = parse_cidr(cidr)
+    broadcast = network | (UINT32_MASK ^ _mask(prefix_len))
+
+    # RFC 3021 treats both addresses of a /31 as usable on point-to-point
+    # links.  A /32 denotes one host.  For both cases the usable interval is
+    # therefore the complete block; for /0..../30, exclude network/broadcast.
+    if prefix_len >= 31:
+        first, last = network, broadcast
+    else:
+        first, last = network + 1, broadcast - 1
+    return _format_ipv4(first), _format_ipv4(last), _format_ipv4(broadcast)
 
 
 class ForwardingTable:
@@ -45,11 +102,23 @@ class ForwardingTable:
     length, the table is malformed - say what you do.
     """
 
+    def __init__(self):
+        # A key is a unique route prefix. Re-adding it updates its next hop.
+        self._routes = {}
+
     def add(self, cidr, next_hop):
-        raise NotImplementedError
+        network, prefix_len = parse_cidr(cidr)
+        self._routes[(network, prefix_len)] = next_hop
 
     def lookup(self, address):
-        raise NotImplementedError
+        value = _parse_ipv4(address)
+        best_len = -1
+        best_hop = None
+        for (network, prefix_len), next_hop in self._routes.items():
+            if prefix_len > best_len and value & _mask(prefix_len) == network:
+                best_len = prefix_len
+                best_hop = next_hop
+        return best_hop
 
 
 # ------------------------------------------------------------------- harness

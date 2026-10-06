@@ -55,10 +55,37 @@ class YourTable:
     """
 
     def __init__(self):
-        raise NotImplementedError("write your table")
+        # A hash table for each of the 33 possible prefix lengths.  Lookup
+        # only visits lengths that actually occur in this routing table.
+        self._by_length = [{} for _ in range(33)]
+        self._lengths = ()
+        self._masks = tuple(
+            0 if length == 0 else (0xFFFFFFFF << (32 - length)) & 0xFFFFFFFF
+            for length in range(33)
+        )
 
     def add(self, network, prefix_len, next_hop):
-        raise NotImplementedError
+        if not isinstance(prefix_len, int) or not 0 <= prefix_len <= 32:
+            raise ValueError("prefix length must be between 0 and 32")
+        if not isinstance(network, int) or not 0 <= network <= 0xFFFFFFFF:
+            raise ValueError("network must be a 32-bit unsigned integer")
+        if network & self._masks[prefix_len] != network:
+            raise ValueError("network has host bits set")
+
+        routes = self._by_length[prefix_len]
+        if not routes:
+            self._lengths = tuple(sorted((*self._lengths, prefix_len), reverse=True))
+        # LinearTable keeps the first exact duplicate because it only replaces
+        # a best match for a strictly longer prefix. Mirror that behavior.
+        routes.setdefault(network, next_hop)
 
     def lookup(self, address):
-        raise NotImplementedError
+        if not isinstance(address, int) or not 0 <= address <= 0xFFFFFFFF:
+            raise ValueError("address must be a 32-bit unsigned integer")
+        for prefix_len in self._lengths:
+            next_hop = self._by_length[prefix_len].get(
+                address & self._masks[prefix_len]
+            )
+            if next_hop is not None:
+                return next_hop
+        return None
