@@ -1,0 +1,8 @@
+400 routers, 1581 links, 1000 events
+
+baseline       SPF runs  1001   wall   1.27s
+yours          SPF runs   290   wall   1.70s   wrong after 0 event(s)
+
+table correct after every event
+full SPF runs avoided 71% (290 instead of 1001)
+grade: good

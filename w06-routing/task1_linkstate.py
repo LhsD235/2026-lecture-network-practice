@@ -14,6 +14,7 @@ in the packet. Build it.
     python3 task1_linkstate.py --verify
 """
 import argparse
+import heapq
 
 # Undirected weighted graph: node -> {neighbour: cost}
 TOPOLOGY = {
@@ -33,7 +34,27 @@ def dijkstra(graph, source):
 
     You write the loop. `heapq` is allowed; `networkx` is not.
     """
-    raise NotImplementedError("implement Dijkstra")
+    if source not in graph:
+        return {}
+
+    distances = {source: 0}
+    queue = [(0, source)]
+    visited = set()
+
+    while queue:
+        cost, node = heapq.heappop(queue)
+        if node in visited:
+            continue
+        visited.add(node)
+
+        for neighbour, weight in graph[node].items():
+            new_cost = cost + weight
+            if new_cost < distances.get(neighbour, float("inf")):
+                distances[neighbour] = new_cost
+                heapq.heappush(queue, (new_cost, neighbour))
+
+    # A router does not need a route to itself in this exercise.
+    return {node: cost for node, cost in distances.items() if node != source}
 
 
 def forwarding_table(graph, source):
@@ -48,7 +69,36 @@ def forwarding_table(graph, source):
     works, but think about what a router does when two shortest paths tie, and
     pick a rule. Say which in observation.md.
     """
-    raise NotImplementedError("implement the forwarding table")
+    if source not in graph:
+        return {}
+
+    # The queue carries the first hop as well as the total cost.  Including it
+    # in the tuple gives a deterministic rule for equal-cost paths: choose the
+    # alphabetically smaller first hop.
+    best = {source: (0, None)}
+    queue = [(0, "", source)]
+    visited = set()
+
+    while queue:
+        cost, queued_hop, node = heapq.heappop(queue)
+        if node in visited:
+            continue
+        visited.add(node)
+
+        for neighbour, weight in sorted(graph[node].items()):
+            if neighbour in visited:
+                continue
+            first_hop = neighbour if node == source else queued_hop
+            candidate = (cost + weight, first_hop)
+            if candidate < best.get(neighbour, (float("inf"), "")):
+                best[neighbour] = candidate
+                heapq.heappush(queue, (candidate[0], candidate[1], neighbour))
+
+    return {
+        destination: first_hop
+        for destination, (_, first_hop) in best.items()
+        if destination != source and first_hop is not None
+    }
 
 
 def link_down(graph, a, b):

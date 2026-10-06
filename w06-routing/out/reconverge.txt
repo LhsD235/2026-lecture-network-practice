@@ -1,0 +1,2 @@
+link down reconvergence: 1 seconds
+link restore reconvergence: 1 seconds

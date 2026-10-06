@@ -1,0 +1,51 @@
+=== domestic: www.korea.ac.kr [163.152.6.10] ===
+
+  1     1 ms     *       27 ms  192.168.35.1
+  2     4 ms     6 ms     4 ms  123.212.146.1
+  3     3 ms     *        5 ms  100.91.114.49
+  4     6 ms     5 ms     3 ms  100.91.3.9
+  5     6 ms     3 ms     5 ms  10.103.0.120
+  6     5 ms     8 ms     6 ms  10.222.25.124
+  7     9 ms     5 ms     6 ms  10.222.11.219
+  8-20  *        *        *     Request timed out.
+
+=== overseas: CS.stanford.edu [171.64.64.64] ===
+
+  1     2 ms     1 ms     1 ms  192.168.35.1
+  2     5 ms     5 ms     5 ms  123.212.146.1
+  3     9 ms     3 ms     7 ms  100.91.113.49
+  4     6 ms     *        5 ms  100.91.4.5
+  5     5 ms     *        4 ms  10.103.1.122
+  6     5 ms     5 ms     7 ms  10.222.25.118
+  7     6 ms     8 ms     4 ms  10.222.10.159
+  8     *       67 ms    65 ms  10.222.2.35
+  9    89 ms    89 ms    92 ms  as6939.equinix-hong-kong.core2.hkg2.he.net [36.255.56.8]
+ 10-11  *        *        *     Request timed out.
+ 12   188 ms   245 ms   302 ms  be2.core1.tyo1.he.net [184.105.64.130]
+ 13     *        *        *     Request timed out.
+ 14   195 ms   199 ms   198 ms  be1.core1.sea1.he.net [184.105.213.117]
+ 15   209 ms   307 ms   199 ms  be9.core3.pdx1.he.net [184.104.196.36]
+ 16     *      236 ms     *     be7.core1.pao1.he.net [184.104.189.142]
+ 17   216 ms   203 ms   203 ms  stanford-university.e0-62.core2.pao1.he.net [184.105.177.238]
+ 18   305 ms   306 ms   193 ms  csee-west-rtr-vl12.SUNet [171.66.0.238]
+ 19   212 ms   191 ms   378 ms  CS.stanford.edu [171.64.64.64]
+
+=== anycast: 1.1.1.1 ===
+
+  1     *        *        4 ms  192.168.35.1
+  2     5 ms     5 ms     4 ms  123.212.146.1
+  3     2 ms     3 ms     *     100.91.113.49
+  4     5 ms     2 ms     *     100.91.4.5
+  5     7 ms     2 ms     2 ms  10.103.1.122
+  6     8 ms     7 ms     6 ms  10.222.25.122
+  7     7 ms     7 ms     5 ms  10.222.10.121
+  8     6 ms     6 ms     5 ms  39.120.253.58
+  9     5 ms     6 ms     5 ms  211.45.68.81
+ 10     6 ms     5 ms     5 ms  211.45.68.82
+ 11     9 ms     6 ms     6 ms  211.56.189.126
+ 12    19 ms    17 ms     7 ms  141.101.82.12
+ 13     8 ms     7 ms     5 ms  1.1.1.1
+
+Captured on 2026-10-06 from this machine with Windows tracert.
+The original www.stanford.edu target resolved to a nearby CDN endpoint, so the
+Stanford Computer Science host was used to observe a genuine overseas path.
